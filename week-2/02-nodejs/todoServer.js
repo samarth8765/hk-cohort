@@ -40,10 +40,110 @@
   Testing the server - run `npm run test-todoServer` command in terminal
  */
 const express = require("express");
-const bodyParser = require("body-parser");
-
 const app = express();
+const fs = require("fs").promises;
+const { v4: uuidv4 } = require("uuid");
 
-app.use(bodyParser.json());
+app.use(express.json());
+
+app.get("/todos", async (req, res) => {
+  try {
+    let data = await fs.readFile("todos.json", "utf-8");
+    data = JSON.parse(data);
+    return res.status(200).json(data);
+  }
+  catch (err) {
+    return res.send(500).send("Internal Server Error");
+  }
+});
+
+app.get("/todos/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    let data = await fs.readFile("todos.json", "utf-8");
+    data = JSON.parse(data);
+    data = data.filter((todo) => {
+      if (todo.id === id) {
+        return true;
+      }
+    });
+
+    if (!data.length) {
+      return res.status(404).send(`Unable to retrieve todo with id ${id}`);
+    }
+    return res.status(200).json(data[0]);
+  }
+  catch (err) {
+    return res.status(500).send(`Internal Server Error`);
+  }
+});
+
+app.post("/todos", async (req, res) => {
+  try {
+    const newTodo = req.body;
+    newTodo.id = uuidv4();
+    let data = await fs.readFile("todos.json", "utf-8");
+    data = JSON.parse(data);
+    data.push(newTodo);
+
+    await fs.writeFile("todos.json", JSON.stringify(data), "utf-8");
+    console.log("New todo is saved successfully");
+    return res.status(201).json(newTodo);
+  }
+  catch (err) {
+    return res.status(500).send("Interal Server Error");
+  }
+});
+
+app.put("/todos/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    let data = await fs.readFile("todos.json", "utf-8");
+    data = JSON.parse(data);
+
+    const idx = data.findIndex(todo => todo.id === id);
+    if (idx === -1) {
+      return res.status(404).send('Todo not found');
+    }
+
+    const { completed, description, title } = req.body;
+    if (completed) {
+      data[idx].completed = completed;
+    }
+    if (description) {
+      data[idx].description = description;
+    }
+    if (title) {
+      data[idx].title = title;
+    }
+
+    await fs.writeFile("todos.json", JSON.stringify(data), "utf-8")
+    return res.status(200).json("Todo has been updated successfully");
+  }
+  catch (err) {
+    return res.status(500).send("Interal Server Error");
+  }
+});
+
+app.delete("/todos/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    let data = await fs.readFile("todos.json", "utf-8");
+    data = JSON.parse(data);
+
+    const idx = data.findIndex(todo => todo.id === id)
+    if (idx === -1) {
+      return res.status(404).send('Todo not found');
+    }
+
+    data.splice(idx, 1);
+    await fs.writeFile("todos.json", JSON.stringify(data), "utf-8");
+    console.log("Todo deleted successfully");
+    return res.status(200).send(`Todo has been deleted successfully`);
+  }
+  catch (err) {
+    return res.status(500).send("Interal Server Error");
+  }
+});
 
 module.exports = app;
